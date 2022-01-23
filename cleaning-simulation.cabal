@@ -51,13 +51,23 @@ executable cleaning-simulation
   main-is:             Main.hs
 
   -- Modules included in this executable, other than Main.
-  other-modules: Test
+  other-modules: Utils Tui Random Objects Environment
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.12 && <4.13
+  build-depends:       
+      base >=4.12 && <4.13,
+      brick >=0.65,
+      text  >=1.2,
+	  ghc,
+	  random,
+      microlens,
+      microlens-th,
+      vty
+  ghc-options:
+      -threaded
 
   -- Directories containing source files.
   hs-source-dirs:      src
