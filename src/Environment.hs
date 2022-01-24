@@ -10,7 +10,8 @@ data Environment = Environment
     dirt :: [Object],
     playpen :: [Object],
     dimension :: (Int, Int),
-    time :: Integer
+    time :: Integer,
+    seed :: Int
   }
   deriving (Show)
 
@@ -49,6 +50,8 @@ adjacentObjects o e =
     ]
 
 adjacentEmpty :: Object -> Environment -> [Coord]
-adjacentEmpty o e = filter empty (adjacentCoords $ location o)
+adjacentEmpty o e = [x | x <- adjacentCoords (location o), validPos x e, empty x]
   where
-    empty c = null $ objectsAt c e 
+    empty c = null $ objectsAt c e
+
+

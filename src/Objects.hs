@@ -1,5 +1,8 @@
 module Objects where
 
+import Data.List
+import Data.Maybe
+
 type Coord = (Int, Int)
 
 adjacentCoords :: Coord -> [Coord]
@@ -12,6 +15,8 @@ adjacentCoords (x, y) =
     (x - 1, y - 1),
     (x - 1, y)
   ]
+
+direction a b = fromMaybe 10 $ elemIndex b (adjacentCoords a)
 
 data Object
   = Kid Coord
@@ -34,3 +39,9 @@ location a = case a of
   Obstacle b -> b
   Dirt b -> b
   Playpen b -> b
+
+isObstacle (Obstacle _) = True
+isObstacle _ = False
+
+isPlaypen (Playpen _) = True
+isPlaypen _ = False

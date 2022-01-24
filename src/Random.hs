@@ -5,7 +5,7 @@ import System.Random
 
 type R a = State StdGen a
 
-runRandom :: R a -> Int -> a
+runRandom :: R Int -> Int -> Int
 runRandom action seed = evalState action $ mkStdGen seed
 
 rand :: R Int
@@ -15,5 +15,5 @@ rand = do
   put gen'
   return r
 
-{- rand :: Int -> Int
-rand i = fst (next (mkStdGen i)) -}
+randTest :: Int -> Int
+randTest i = fst (next (mkStdGen i))
