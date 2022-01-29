@@ -45,3 +45,6 @@ isObstacle _ = False
 
 isPlaypen (Playpen _) = True
 isPlaypen _ = False
+
+isKid ( Kid _ ) = True
+isKid _ = False

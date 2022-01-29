@@ -4,43 +4,63 @@ import Environment
 import Objects
 import Random
 
-kidAction kid e =
-  let s = runRandom rand (seed e)
-   in if even s || any isPlaypen (objectsAt (location kid) e)
-        then e {seed = s}
+kidAction :: Object -> Environment -> Environment
+kidAction kid env =
+  let s = runRandom rand (seed env)
+   in if even s || any isPlaypen (objectsAt (location kid) env)
+        then env {seed = s}
         else
-          let obstacles = filter isObstacle (adjacentObjects kid e)
-              empty = adjacentEmpty kid e
+          let obstacles = filter isObstacle (adjacentObjects kid env)
+              empty = adjacentEmpty kid env
               decisions = length empty + length obstacles
-              newSeed = runRandom rand (seed e)
-              decision = mod newSeed decisions
+              s1 = runRandom rand (seed env)
+              decision = mod s1 decisions
            in if decision < length empty
-                then moveObject kid (Kid (empty !! decision)) e {seed = newSeed}
+                then moveObject kid (Kid (empty !! decision)) env {seed = s1}
                 else
                   let decision = decision - length empty - 1
-                      o = obstacles !! decision
-                      d = direction (location kid) (location o)
-                      (succeed, newEnv) = moveObstacle d o e
+                      obst = obstacles !! decision
+                      dir = direction (location kid) (location obst)
+                      (succeed, newEnv) = moveObstacle dir obst env
                    in if succeed
-                        then moveObject kid (Kid (location o)) newEnv
-                        else e
+                        then moveObject kid (Kid (location obst)) newEnv
+                        else env
 
-moveObstacle d o e =
-  let position = adjacentCoords (location o) !! d
-   in if not (validPos position e)
-        then (False, e)
+moveObstacle :: Int -> Object -> Environment -> (Bool, Environment)
+moveObstacle dir obst env =
+  let position = adjacentCoords (location obst) !! dir
+   in if not (validPos position env)
+        then (False, env)
         else
-          if position `elem` adjacentEmpty o e
-            then (True, moveObject o (Obstacle position) e)
+          if position `elem` adjacentEmpty obst env
+            then (True, moveObject obst (Obstacle position) env)
             else
-              let adjObstacles = filter isObstacle (objectsAt position e)
+              let adjObstacles = filter isObstacle (objectsAt position env)
                in if null adjObstacles
-                    then (False, e)
+                    then (False, env)
                     else
                       let adjObstacle = head adjObstacles
-                          (succeed, newEnv) = moveObstacle d adjObstacle e
+                          (succeed, newEnv) = moveObstacle dir adjObstacle env
                        in if succeed
-                            then (True, moveObject o (Obstacle position) newEnv)
-                            else (False, e)
+                            then (True, moveObject obst (Obstacle position) newEnv)
+                            else (False, env)
 
--- placeDirt c p e =
+generateDirt :: Coord ->  Environment -> Environment
+generateDirt center  env = 
+  let kidsCount = length $ filter isKid (adjacentObjects  ( Kid center ) env)
+    in case kidsCount of
+         1 -> placeDirt 1 env
+         2 -> placeDirt 3 env
+         _ -> placeDirt 6 env
+  where
+    placeDirt count env =
+      let s = runRandom rand (seed env)
+          genDirt = even s
+          emptyPositions = adjacentEmpty (Kid center) env
+       in if count>0 && genDirt && not (null emptyPositions)
+            then
+              let s1 = runRandom rand s
+                  position = emptyPositions !! mod s1 (length emptyPositions)
+                  newEnv = addObject ( Dirt position ) env
+               in placeDirt ( count - 1 ) newEnv
+            else env
