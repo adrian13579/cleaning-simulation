@@ -6,6 +6,7 @@ import Objects
 import Simulation
 import Tui
 import Data.Matrix
+import Robots
 
 {- main :: IO ()
 main = putStr $ printPrettyEnvironment (kidAction (Kid (0, 0)) initEnv) -}

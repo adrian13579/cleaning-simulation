@@ -1,6 +1,6 @@
-module Simulation where
+module Robots where
 
-{- import Data.Matrix
+import Data.Matrix
 import qualified Debug.Trace as Db
 import Environment
 import Objects
@@ -33,4 +33,4 @@ findPath source dest distances env path =
       (_, next) = minimum ([(distances ! (i + 1, j + 1), (i, j)) | (i, j) <- adjacents])
    in if dest `elem` adjacents
         then path
-        else findPath next dest distances env (next : path) -}
+        else findPath next dest distances env (next : path)
