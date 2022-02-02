@@ -1,6 +1,9 @@
 module Utils where
 
-delete e = filter ( /= e )
+import Data.Set 
+
+mkUniq :: Ord a => [a] -> [a]
+mkUniq = toList . fromList
 
 
 

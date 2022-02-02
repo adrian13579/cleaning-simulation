@@ -59,13 +59,10 @@ executable cleaning-simulation
   -- Other library packages from which modules are imported.
   build-depends:       
       base >=4.12 && <4.13,
-      brick >=0.65,
-      text  >=1.2,
 	  ghc,
 	  random,
-      microlens,
-      microlens-th,
-      vty
+	  matrix,
+	  containers
   ghc-options:
       -threaded
 

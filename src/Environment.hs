@@ -15,6 +15,23 @@ data Environment = Environment
   }
   deriving (Show)
 
+initEnv =
+  Environment
+    { robots = [],
+      kids = [Kid (0, 0)],
+      obstacles = [Obstacle (1, 0), Obstacle (0, 1), Obstacle (1, 2), Obstacle (0, 2)],
+      -- obstacles = [],
+      dirt = [],
+      playpen = [],
+      dimension = (3, 5),
+      time = 0,
+      seed = 1
+      -- seed = 5
+    }
+
+randomEnv :: Int -> Environment
+randomEnv seed = initEnv
+
 objects :: Environment -> [Object]
 objects e = kids e ++ obstacles e ++ dirt e ++ playpen e ++ robots e
 
@@ -38,10 +55,10 @@ removeObject o e = case o of
   Robot a b coord -> e {robots = delete (Robot a b coord) (robots e)}
 
 moveObject :: Object -> Object -> Environment -> Environment
-moveObject a b e = addObject a $ removeObject b e
+moveObject b a e = addObject a $ removeObject b e
 
 validPos :: Coord -> Environment -> Bool
-validPos (x, y) e = let (n, m) = dimension e in y <= n && x <= m
+validPos (x, y) e = let (n, m) = dimension e in y >= 0 && y < m && x < n && x >= 0
 
 adjacentObjects :: Object -> Environment -> [Object]
 adjacentObjects o e =
@@ -49,9 +66,19 @@ adjacentObjects o e =
     [ objectsAt x e | x <- adjacentCoords (location o), validPos x e
     ]
 
+adjacentObjectsCoords :: Coord -> Environment -> [Object]
+adjacentObjectsCoords c e =
+  concat
+    [ objectsAt x e | x <- adjacentCoords c, validPos x e
+    ]
+
 adjacentEmpty :: Object -> Environment -> [Coord]
 adjacentEmpty o e = [x | x <- adjacentCoords (location o), validPos x e, empty x]
   where
     empty c = null $ objectsAt c e
 
+adjacentEmptyCoords :: Coord -> Environment -> [Coord]
+adjacentEmptyCoords c e = [x | x <- adjacentCoords c, validPos x e, empty x]
+  where
+    empty c = null $ objectsAt c e
 

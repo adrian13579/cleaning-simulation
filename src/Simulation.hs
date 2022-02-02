@@ -1,9 +1,11 @@
 module Simulation where
 
-import Debug.Trace
+import Data.Matrix
+import qualified Debug.Trace as Db
 import Environment
 import Objects
 import Random
+import Utils (mkUniq)
 
 kidAction :: Object -> Environment -> Environment
 kidAction kid env =
@@ -11,15 +13,15 @@ kidAction kid env =
    in if even s || any isPlaypen (objectsAt (location kid) env)
         then env {seed = s}
         else
-          let obstacles =  filter isObstacle (adjacentObjects kid env)
+          let obstacles = filter isObstacle (adjacentObjects kid env)
               empty = adjacentEmpty kid env
               decisions = length empty + length obstacles
-              s1 =  runRandom rand (seed env)
-              decision =  mod s1 decisions
-           in if decision < trace ( show $ length empty ) length empty
-                then generateDirt (location kid) $  moveObject kid (Kid (empty !! decision)) env {seed = s1}
+              s1 = runRandom rand (seed env)
+              decision = mod s1 decisions
+           in if decision < Db.trace (show $ length empty) length empty
+                then generateDirt (location kid) $ moveObject kid (Kid (empty !! decision)) env {seed = s1}
                 else
-                  let obst =  obstacles !! (decision - length empty )
+                  let obst = obstacles !! (decision - length empty)
                       dir = direction (location kid) (location obst)
                       (succeed, newEnv) = moveObstacle dir obst env {seed = s1}
                    in if succeed
@@ -28,7 +30,7 @@ kidAction kid env =
 
 moveObstacle :: Int -> Object -> Environment -> (Bool, Environment)
 moveObstacle dir obst env =
-  let position = trace "Moving obstacles ..." adjacentCoords (location obst) !! dir
+  let position = Db.trace "Moving obstacles ..." adjacentCoords (location obst) !! dir
    in if not (validPos position env)
         then (False, env)
         else
@@ -55,7 +57,7 @@ generateDirt center env =
   where
     placeDirt count env =
       let s = runRandom rand (seed env)
-          genDirt = trace "Generating dirt..." even s
+          genDirt = Db.trace "Generating dirt..." even s
           emptyPositions = adjacentEmpty (Kid center) env
        in if count > 0 && genDirt && not (null emptyPositions)
             then
@@ -65,5 +67,30 @@ generateDirt center env =
                in placeDirt (count - 1) newEnv
             else env {seed = s}
 
+scanEnv :: Coord -> Environment -> Matrix Int
+scanEnv position env =
+  let (n, m) = dimension env
+      v = matrix n m (\_ -> m * n)
+   in nearestObjects 1 [position] v
+  where
+    nearestObjects distance queue visited =
+      let adjacents = mkUniq $ nonVisitedAdjCoord queue visited
+          newVisited = setDistance distance adjacents visited
+       in if null adjacents
+            then visited
+            else nearestObjects (distance + 1) adjacents newVisited
+    nonVisitedAdjCoord [] _ = []
+    nonVisitedAdjCoord (x : xs) visited =
+      [ (i, j) | (i, j) <- adjacentEmptyCoords x env, visited ! (i + 1, j + 1) == uncurry (*) (dimension env)
+      ]
+        ++ nonVisitedAdjCoord xs visited
+    setDistance _ [] m = m
+    setDistance v ((i, j) : xs) m = setDistance v xs (setElem v (i + 1, j + 1) m)
 
-
+findPath :: Coord -> Coord -> Matrix Int -> Environment -> [Coord] -> [Coord]
+findPath source dest distances env path =
+  let adjacents = [x | x <- adjacentCoords source, validPos x env]
+      (_, next) = minimum ([(distances ! (i + 1, j + 1), (i, j)) | (i, j) <- adjacents])
+   in if dest `elem` adjacents
+        then path
+        else findPath next dest distances env (next : path)
