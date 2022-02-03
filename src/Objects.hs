@@ -25,10 +25,12 @@ data Object
   | Dirt Coord
   | Playpen Coord
   | Robot RobotType (Maybe Object) Coord
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data RobotType = AlphaRobot | BetaRobot
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
+
+getKid ( Robot _ k _ ) = k
 
 samePos :: Object -> Object -> Bool
 samePos a b = location a == location b
@@ -49,3 +51,6 @@ isPlaypen _ = False
 
 isKid ( Kid _ ) = True
 isKid _ = False
+
+isDirt ( Dirt _ ) = True
+isDirt _ = False
