@@ -1,36 +1,34 @@
 module Simulation where
 
-{- import Data.Matrix
 import qualified Debug.Trace as Db
 import Environment
-import Objects
-import Random
-import Utils (mkUniq)
+import Robots
+import Tui
 
-scanEnv :: Coord -> Environment -> Matrix Int
-scanEnv position env =
-  let (n, m) = dimension env
-      v = matrix n m (\_ -> m * n)
-   in nearestObjects 1 [position] v
+runSimulation env limitTime =
+  if time env == limitTime -- TODO: or 60% clean
+    then env
+    else
+      let env1 = Db.trace ("Agents:\n" ++ printPrettyEnvironment (nextStateAgent env)) nextStateAgent env
+          env2 = Db.trace ("Environment:\n" ++ printPrettyEnvironment (nextStateEnv env1)) nextStateEnv env1
+       in Db.trace
+            (" Environment State:\n" ++ printPrettyEnvironment env2 {time = time env + 1})
+            runSimulation
+            env2 {time = time env + 1}
+            limitTime
+
+nextStateEnv env =
+  nextStateEnvAux env 0
   where
-    nearestObjects distance queue visited =
-      let adjacents = mkUniq $ nonVisitedAdjCoord queue visited
-          newVisited = setDistance distance adjacents visited
-       in if null adjacents
-            then visited
-            else nearestObjects (distance + 1) adjacents newVisited
-    nonVisitedAdjCoord [] _ = []
-    nonVisitedAdjCoord (x : xs) visited =
-      [ (i, j) | (i, j) <- adjacentEmptyCoords x env, visited ! (i + 1, j + 1) == uncurry (*) (dimension env)
-      ]
-        ++ nonVisitedAdjCoord xs visited
-    setDistance _ [] m = m
-    setDistance v ((i, j) : xs) m = setDistance v xs (setElem v (i + 1, j + 1) m)
+    nextStateEnvAux env index =
+      if index == length (kids env)
+        then env
+        else nextStateEnvAux (kidAction (kids env !! index) env) (index + 1)
 
-findPath :: Coord -> Coord -> Matrix Int -> Environment -> [Coord] -> [Coord]
-findPath source dest distances env path =
-  let adjacents = [x | x <- adjacentCoords source, validPos x env]
-      (_, next) = minimum ([(distances ! (i + 1, j + 1), (i, j)) | (i, j) <- adjacents])
-   in if dest `elem` adjacents
-        then path
-        else findPath next dest distances env (next : path) -}
+nextStateAgent env =
+  nextStateAgentAux env 0
+  where
+    nextStateAgentAux env index =
+      if Db.trace ("hola" ++ show ( index == length ( robots env ) )) index == length (robots env)
+        then env
+        else nextStateAgentAux (robotAction (robots env !! index) env) (index + 1)
