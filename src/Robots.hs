@@ -1,36 +1,111 @@
 module Robots where
 
+import Data.List()
 import Data.Matrix
-import qualified Debug.Trace as Db
+import qualified Debug.Trace as Db()
 import Environment
 import Objects
-import Random
+import Random()
 import Utils (mkUniq)
 
-scanEnv :: Coord -> Environment -> Matrix Int
+robotAction :: Object -> Environment -> Environment
+robotAction robot env = case robot of
+  Robot AlphaRobot _ _ -> alphaRobotAction robot env
+  Robot BetaRobot _ _ -> env
+
+alphaRobotAction robot env =
+  let (dist, objects) = scanEnv (location robot) env
+   in case robot of
+        Robot _ (Just (Kid _)) coord ->
+          if any isPlaypen (objectsAt coord env)
+            then dropKid robot env
+            else
+              let playpen = [x | x <- objects, freePlaypen x env]
+                  dirt = [x | x <- objects, isDirt x]
+                  targetPlaypen = location $ head playpen
+                  targetDirt = location $ head dirt
+               in if null playpen
+                    then
+                      if null dirt
+                        then env
+                        else
+                          let path = findPath coord targetDirt dist env
+                           in case length path of
+                                0 -> env 
+                                1 -> moveObjectToCoord robot (head path) env
+                                _ -> moveObjectToCoord robot (path !! 2) env
+                    else
+                      let path = findPath coord targetPlaypen dist env
+                       in case length path of
+                            0 -> env 
+                            1 -> moveObjectToCoord robot (head path) env
+                            _ -> moveObjectToCoord robot (path !! 2) env
+        Robot _ Nothing coord ->
+          let first = head ([x | x <- filter (/= robot) objects, isKid x || isDirt x])
+           in if null objects
+                then env
+                else
+                  if location first == coord
+                    then case first of
+                      Dirt _ -> cleanDirt first env
+                      Kid _ ->
+                        if any isPlaypen (objectsAt coord env)
+                          then env
+                          else carryKid robot first env
+                    else moveObjectToCoord robot (head (findPath coord (location first) dist env)) env
+
+freePlaypen (Playpen coord) env =
+  null [x | x <- objectsAt coord env, x /= Playpen coord]
+freePlaypen _ _ = False
+
+carryKid (Robot t o c) kid env =
+  let env1 = removeObject kid env
+      env2 = removeObject (Robot t o c) env1
+      env3 = addObject (Robot t (Just kid) c) env2
+   in env3
+
+dropKid (Robot t o c) env =
+  let env1 = addObject (Kid c) env
+      env2 = removeObject (Robot t o c) env1
+      env3 = addObject (Robot t Nothing c) env2
+   in env3
+
+cleanDirt (Dirt coord) = removeObject (Dirt coord)
+
+scanEnv :: Coord -> Environment -> (Matrix Int, [Object])
 scanEnv position env =
   let (n, m) = dimension env
       v = matrix n m (\_ -> m * n)
-   in nearestObjects 1 [position] v
+   in nearestObjects 1 [position] v (objectsAt position env)
   where
-    nearestObjects distance queue visited =
+    nearestObjects distance queue visited objects =
       let adjacents = mkUniq $ nonVisitedAdjCoord queue visited
           newVisited = setDistance distance adjacents visited
+          newObjects = visitedObjects (queue ++ adjacents) objects
        in if null adjacents
-            then visited
-            else nearestObjects (distance + 1) adjacents newVisited
+            then (visited, newObjects)
+            else nearestObjects (distance + 1) adjacents newVisited newObjects
+
     nonVisitedAdjCoord [] _ = []
     nonVisitedAdjCoord (x : xs) visited =
-      [ (i, j) | (i, j) <- adjacentEmptyCoords x env, visited ! (i + 1, j + 1) == uncurry (*) (dimension env)
+      [ (i, j) | (i, j) <- adjacentAccesibleCoords x env, visited ! (i + 1, j + 1) == uncurry (*) (dimension env)
       ]
         ++ nonVisitedAdjCoord xs visited
+
+    visitedObjects [] obj = obj
+    visitedObjects (x : xs) obj =
+      let newObj = [o | o <- adjacentObjectsCoords x env, o `notElem` obj]
+       in visitedObjects xs (obj ++ newObj)
+
     setDistance _ [] m = m
     setDistance v ((i, j) : xs) m = setDistance v xs (setElem v (i + 1, j + 1) m)
 
-findPath :: Coord -> Coord -> Matrix Int -> Environment -> [Coord] -> [Coord]
-findPath source dest distances env path =
-  let adjacents = [x | x <- adjacentCoords source, validPos x env]
-      (_, next) = minimum ([(distances ! (i + 1, j + 1), (i, j)) | (i, j) <- adjacents])
-   in if dest `elem` adjacents
-        then path
-        else findPath next dest distances env (next : path)
+findPath source dest distances env =
+  reverse $ findPathReverse dest source distances env [dest]
+  where
+    findPathReverse source dest distances env path =
+      let adjacents = [x | x <- adjacentCoords source, validPos x env]
+          (_, next) = minimum ([(distances ! (i + 1, j + 1), (i, j)) | (i, j) <- adjacents])
+       in if dest `elem` adjacents
+            then path
+            else findPathReverse next dest distances env (path ++ [next])
