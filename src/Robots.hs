@@ -2,7 +2,6 @@ module Robots where
 
 import Data.List ()
 import Data.Matrix
-import qualified Debug.Trace as Db (trace)
 import Environment
 import Objects
 import Random ()
@@ -18,7 +17,7 @@ betaRobotAction robot env =
    in case robot of
         Robot BetaRobot (Just (Kid _)) coord ->
           let playpen = [x | x <- objects, freePlaypen x robot env]
-              dirt = [x | x <- objects, isDirt x]
+              dirt = [x | x <- objects, isDirtOnly x robot env]
               targetPlaypen = head playpen
               targetDirt = head dirt
            in if null playpen
@@ -39,7 +38,7 @@ betaRobotAction robot env =
                         _ -> moveObjectToCoord robot (path !! 1) env
         Robot BetaRobot Nothing coord ->
           let kids = [x | x <- filter (/= robot) objects, freeKid x env]
-              dirt = [x | x <- filter (/= robot) objects, isDirt x]
+              dirt = [x | x <- filter (/= robot) objects, isDirtOnly x robot env]
            in if null kids
                 then
                   if null dirt
@@ -69,7 +68,7 @@ alphaRobotAction robot env =
    in case robot of
         Robot AlphaRobot (Just (Kid _)) coord ->
           let playpen = [x | x <- objects, freePlaypen x robot env]
-              dirt = [x | x <- objects, isDirt x]
+              dirt = [x | x <- objects, isDirtOnly x robot env]
               targetPlaypen = head playpen
               targetDirt = head dirt
            in if null playpen
@@ -89,7 +88,7 @@ alphaRobotAction robot env =
                         1 -> moveObjectToCoord robot (head path) env
                         _ -> moveObjectToCoord robot (path !! 1) env
         Robot AlphaRobot Nothing coord ->
-          let decisions = [x | x <- filter (/= robot) objects, freeKid x env || isDirt x]
+          let decisions = [x | x <- filter (/= robot) objects, freeKid x env || isDirtOnly x robot env]
            in if null decisions
                 then env
                 else
@@ -111,6 +110,10 @@ alphaRobotAction robot env =
 freeKid (Kid coord) env =
   not $ any isPlaypen (objectsAt coord env)
 freeKid _ _ = False
+
+isDirtOnly (Dirt coord) robot env =
+  null [x | x <- objectsAt coord env, x /= robot, x /= Dirt coord]
+isDirtOnly _ _ _ = False
 
 freePlaypen (Playpen coord) robot env =
   null [x | x <- objectsAt coord env, x /= robot, x /= Playpen coord]
