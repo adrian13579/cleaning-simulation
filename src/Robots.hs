@@ -1,68 +1,126 @@
 module Robots where
 
-import Data.List()
+import Data.List ()
 import Data.Matrix
-import qualified Debug.Trace as Db()
+import qualified Debug.Trace as Db (trace)
 import Environment
 import Objects
-import Random()
+import Random ()
 import Utils (mkUniq)
 
 robotAction :: Object -> Environment -> Environment
 robotAction robot env = case robot of
   Robot AlphaRobot _ _ -> alphaRobotAction robot env
-  Robot BetaRobot _ _ -> env
+  Robot BetaRobot _ _ -> betaRobotAction robot env
+
+betaRobotAction robot env =
+  let (dist, objects) = scanEnv (location robot) env
+   in case robot of
+        Robot BetaRobot (Just (Kid _)) coord ->
+          let playpen = [x | x <- objects, freePlaypen x robot env]
+              dirt = [x | x <- objects, isDirt x]
+              targetPlaypen = head playpen
+              targetDirt = head dirt
+           in if null playpen
+                then
+                  if null dirt
+                    then env
+                    else
+                      let path = findPath coord (location targetDirt) dist env
+                       in case length path of
+                            0 -> cleanDirt targetDirt env
+                            1 -> moveObjectToCoord robot (head path) env
+                            _ -> moveObjectToCoord robot (path !! 1) env
+                else
+                  let path = findPath coord (location targetPlaypen) dist env
+                   in case length path of
+                        0 -> dropKid robot env
+                        1 -> moveObjectToCoord robot (head path) env
+                        _ -> moveObjectToCoord robot (path !! 1) env
+        Robot BetaRobot Nothing coord ->
+          let kids = [x | x <- filter (/= robot) objects, freeKid x env]
+              dirt = [x | x <- filter (/= robot) objects, isDirt x]
+           in if null kids
+                then
+                  if null dirt
+                    then env
+                    else
+                      let first = head dirt
+                          path = findPath coord (location first) dist env
+                       in case length path of
+                            0 -> cleanDirt first env
+                            _ -> moveObjectToCoord robot (head path) env
+                else
+                  let first = head kids
+                      path = findPath coord (location first) dist env
+                   in case length path of
+                        0 -> case first of
+                          Kid _ -> snd $ carryKid robot first env
+                          _ -> env
+                        1 -> case first of
+                          Kid _ ->
+                            let (robotWithKid, env1) = carryKid robot first env
+                             in moveObjectToCoord robotWithKid (head path) env1
+                          _ -> env
+                        _ -> moveObjectToCoord robot (head path) env
 
 alphaRobotAction robot env =
   let (dist, objects) = scanEnv (location robot) env
    in case robot of
-        Robot _ (Just (Kid _)) coord ->
-          if any isPlaypen (objectsAt coord env)
-            then dropKid robot env
-            else
-              let playpen = [x | x <- objects, freePlaypen x env]
-                  dirt = [x | x <- objects, isDirt x]
-                  targetPlaypen = location $ head playpen
-                  targetDirt = location $ head dirt
-               in if null playpen
-                    then
-                      if null dirt
-                        then env
-                        else
-                          let path = findPath coord targetDirt dist env
-                           in case length path of
-                                0 -> env 
-                                1 -> moveObjectToCoord robot (head path) env
-                                _ -> moveObjectToCoord robot (path !! 2) env
+        Robot AlphaRobot (Just (Kid _)) coord ->
+          let playpen = [x | x <- objects, freePlaypen x robot env]
+              dirt = [x | x <- objects, isDirt x]
+              targetPlaypen = head playpen
+              targetDirt = head dirt
+           in if null playpen
+                then
+                  if null dirt
+                    then env
                     else
-                      let path = findPath coord targetPlaypen dist env
+                      let path = findPath coord (location targetDirt) dist env
                        in case length path of
-                            0 -> env 
+                            0 -> cleanDirt targetDirt env
                             1 -> moveObjectToCoord robot (head path) env
-                            _ -> moveObjectToCoord robot (path !! 2) env
-        Robot _ Nothing coord ->
-          let first = head ([x | x <- filter (/= robot) objects, isKid x || isDirt x])
-           in if null objects
+                            _ -> moveObjectToCoord robot (path !! 1) env
+                else
+                  let path = findPath coord (location targetPlaypen) dist env
+                   in case length path of
+                        0 -> dropKid robot env
+                        1 -> moveObjectToCoord robot (head path) env
+                        _ -> moveObjectToCoord robot (path !! 1) env
+        Robot AlphaRobot Nothing coord ->
+          let decisions = [x | x <- filter (/= robot) objects, freeKid x env || isDirt x]
+           in if null decisions
                 then env
                 else
-                  if location first == coord
-                    then case first of
-                      Dirt _ -> cleanDirt first env
-                      Kid _ ->
-                        if any isPlaypen (objectsAt coord env)
-                          then env
-                          else carryKid robot first env
-                    else moveObjectToCoord robot (head (findPath coord (location first) dist env)) env
+                  let first = head decisions
+                      path = findPath coord (location first) dist env
+                   in case length path of
+                        0 -> case first of
+                          Kid _ -> snd $ carryKid robot first env
+                          Dirt _ -> cleanDirt first env
+                          _ -> env
+                        1 -> case first of
+                          Kid _ ->
+                            let (robotWithKid, env1) = carryKid robot first env
+                             in moveObjectToCoord robotWithKid (location first) env1
+                          Dirt _ -> moveObjectToCoord robot (location first) env
+                          _ -> env
+                        _ -> moveObjectToCoord robot (head path) env
 
-freePlaypen (Playpen coord) env =
-  null [x | x <- objectsAt coord env, x /= Playpen coord]
-freePlaypen _ _ = False
+freeKid (Kid coord) env =
+  not $ any isPlaypen (objectsAt coord env)
+freeKid _ _ = False
+
+freePlaypen (Playpen coord) robot env =
+  null [x | x <- objectsAt coord env, x /= robot, x /= Playpen coord]
+freePlaypen _ _ _ = False
 
 carryKid (Robot t o c) kid env =
   let env1 = removeObject kid env
       env2 = removeObject (Robot t o c) env1
       env3 = addObject (Robot t (Just kid) c) env2
-   in env3
+   in (Robot t (Just kid) c, env3)
 
 dropKid (Robot t o c) env =
   let env1 = addObject (Kid c) env
@@ -101,7 +159,9 @@ scanEnv position env =
     setDistance v ((i, j) : xs) m = setDistance v xs (setElem v (i + 1, j + 1) m)
 
 findPath source dest distances env =
-  reverse $ findPathReverse dest source distances env [dest]
+  if source == dest
+    then []
+    else reverse $ findPathReverse dest source distances env [dest]
   where
     findPathReverse source dest distances env path =
       let adjacents = [x | x <- adjacentCoords source, validPos x env]
