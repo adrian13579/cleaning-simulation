@@ -17,22 +17,43 @@ data Environment = Environment
   }
   deriving (Show)
 
+
 initEnv =
   Environment
-    { robots = [Robot AlphaRobot Nothing (1, 1)],
+    { robots = [Robot BetaRobot Nothing (1, 1)],
       kids = [Kid (0, 1), Kid (0, 0)],
       obstacles = [Obstacle (1, 0), Obstacle (1, 2), Obstacle (0, 2), Obstacle (0, 3), Obstacle (0, 4)],
-      -- obstacles = [],
       dirt = [Dirt (2, 3)],
-      playpen = [],
+      playpen = [Playpen (4, 4)],
       dimension = (5, 5),
       time = 0,
       seed = 5
-      -- seed = 5
     }
 
-randomEnv :: Int -> Environment
-randomEnv seed = initEnv{seed= seed}
+randomEnv seed childsCount obstaclesCount robotType robotCount m n =
+  let p0 = [(i, j) | i <- [0 .. m - 1], j <- [0 .. n - 1]]
+      (playpens, p1) = genPlaypen childsCount p0
+      s = shuffle seed p1
+      (robots, p2) = genRobot robotCount s robotType
+      (childs, p3) = genKids childsCount p2
+      (obstacle, p4) = genObstacles obstaclesCount p3
+      (dirt, _) = genDirt (m * n `div` 2) p4
+   in Environment
+        { robots = robots,
+          kids = childs,
+          obstacles = obstacle,
+          dirt = dirt,
+          playpen = playpens,
+          dimension = (m, n),
+          time = 0,
+          seed = seed
+        }
+  where
+    genRobot count positions robotType = ([Robot robotType Nothing x | x <- take count positions], drop count positions)
+    genPlaypen count positions = ([Playpen x | x <- take count positions], drop count positions)
+    genDirt count positions = ([Dirt x | x <- take count positions], drop count positions)
+    genObstacles count positions = ([Obstacle x | x <- take count positions], drop count positions)
+    genKids count positions = ([Kid x | x <- take count positions], drop count positions)
 
 objects :: Environment -> [Object]
 objects e = kids e ++ obstacles e ++ dirt e ++ playpen e ++ robots e
@@ -108,15 +129,18 @@ kidAction kid env =
               decisions = length empty + length obstacles
               s1 = runRandom rand (seed env)
               decision = mod s1 decisions
-           in if decision < length empty
-                then generateDirt (location kid) $ moveObject kid (Kid (empty !! decision)) env {seed = s1}
-                else
-                  let obst = obstacles !! (decision - length empty)
-                      dir = direction (location kid) (location obst)
-                      (succeed, newEnv) = moveObstacle dir obst env {seed = s1}
-                   in if succeed
-                        then  generateDirt (location kid) $ moveObject kid (Kid (location obst)) newEnv
-                        else env {seed = s1}
+           in if decisions > 0
+                then
+                  if decision < length empty
+                    then generateDirt (location kid) $ moveObject kid (Kid (empty !! decision)) env {seed = s1}
+                    else
+                      let obst = obstacles !! (decision - length empty)
+                          dir = direction (location kid) (location obst)
+                          (succeed, newEnv) = moveObstacle dir obst env {seed = s1}
+                       in if succeed
+                            then generateDirt (location kid) $ moveObject kid (Kid (location obst)) newEnv
+                            else env {seed = s1}
+                else env
 
 moveObstacle :: Int -> Object -> Environment -> (Bool, Environment)
 moveObstacle dir obst env =
