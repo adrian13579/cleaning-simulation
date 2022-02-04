@@ -17,7 +17,6 @@ data Environment = Environment
   }
   deriving (Show)
 
-
 initEnv =
   Environment
     { robots = [Robot BetaRobot Nothing (1, 1)],
@@ -116,7 +115,7 @@ adjacentAccesibleCoords c e = [x | x <- adjacentCoords c, validPos x e, accesibl
   where
     accesible x =
       let objs = objectsAt x e
-       in null objs || (length objs == 1 && isDirt (head objs))
+       in null objs || (length objs == 1 && (isDirt (head objs) || isPlaypen (head objs)))
 
 kidAction :: Object -> Environment -> Environment
 kidAction kid env =
@@ -149,7 +148,7 @@ moveObstacle dir obst env =
         then (False, env)
         else
           if position `elem` adjacentEmpty obst env
-            then Db.trace "Moving obstacles ..." (True, moveObject obst (Obstacle position) env)
+            then (True, moveObject obst (Obstacle position) env)
             else
               let adjObstacles = filter isObstacle (objectsAt position env)
                in if null adjObstacles
@@ -158,7 +157,7 @@ moveObstacle dir obst env =
                       let adjObstacle = head adjObstacles
                           (succeed, newEnv) = moveObstacle dir adjObstacle env
                        in if succeed
-                            then Db.trace "Moving obstacles ..." (True, moveObject obst (Obstacle position) newEnv)
+                            then (True, moveObject obst (Obstacle position) newEnv)
                             else (False, env)
 
 generateDirt :: Coord -> Environment -> Environment
@@ -178,5 +177,5 @@ generateDirt center env =
               let s1 = runRandom rand s
                   position = emptyPositions !! mod s1 (length emptyPositions)
                   newEnv = addObject (Dirt position) env {seed = s1}
-               in Db.trace "Generating dirt..." placeDirt (count - 1) newEnv
+               in placeDirt (count - 1) newEnv
             else env {seed = s}
